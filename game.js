@@ -14,6 +14,11 @@
   // Logical playfield (game coordinates). Backing store is 2x for HD.
   var W = 480;
   var H = 720;
+  // Best graphics: devicePixelRatio-aware backing store. 2x minimum (HD),
+  // up to 3x on retina phones (1440x2160). Falls back to 2x if DPR is unknown.
+  var DPR = 2;
+  try { DPR = Math.min(3, Math.max(2, (typeof window !== 'undefined' && window.devicePixelRatio) || 2)); } catch (e) { DPR = 2; }
+  try { canvas.width = W * DPR; canvas.height = H * DPR; } catch (e) {}
   var SCALE = (canvas.width || 480) / W;
   var WIN_SCORE = 500;
   var BASE_SPEED = 370;
@@ -85,6 +90,30 @@
   var trailTimer = 0;
   var shootTimer = 0;
   var shootingStar = null;
+  var shockwaves = [];
+  // Auto quality: if frames run slow on a phone, drop particle counts and
+  // shadowBlur so it stays near 60fps. Default is max quality.
+  var qualityLevel = 0; // 0=max, 1=medium, 2=low
+  var particleCap = 240;
+  var frameEma = 16;
+  var frameCount = 0;
+  function makeGlow(color) {
+    try {
+      var c = document.createElement('canvas');
+      c.width = 64; c.height = 64;
+      var g = c.getContext('2d');
+      var gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+      gr.addColorStop(0, color);
+      gr.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = gr;
+      g.fillRect(0, 0, 64, 64);
+      return c;
+    } catch (e) { return null; }
+  }
+  var glowGold = makeGlow('rgba(255,209,102,0.95)');
+  var glowCyan = makeGlow('rgba(76,201,240,0.9)');
+  var glowRed = makeGlow('rgba(255,80,80,0.85)');
+  var glowOrange = makeGlow('rgba(255,159,28,0.8)');
 
   var player = { x: W / 2, y: H - 110, r: 18, vx: 0, vy: 0, tilt: 0, tx: W / 2, ty: H - 110, dragging: false };
   function playerSpeed() { return BASE_SPEED * settings.sensitivity; }
@@ -97,7 +126,8 @@
   // HD background: 140 twinkling stars + 6 slow nebula blobs.
   var bgStars = [];
   for (var i = 0; i < 140; i++) {
-    bgStars.push({ x: Math.random() * W, y: Math.random() * H, s: Math.random() * 2 + 0.5, v: Math.random() * 30 + 8, tw: Math.random() * Math.PI * 2, tws: 0.5 + Math.random() * 2 });
+    var layer = i % 3; // 0=far (slow/small), 1=mid, 2=near (fast/bright) — parallax
+    bgStars.push({ x: Math.random() * W, y: Math.random() * H, s: (layer === 2 ? 2.2 : layer === 1 ? 1.4 : 0.8) + Math.random() * 0.8, v: (layer === 2 ? 34 : layer === 1 ? 20 : 9) + Math.random() * 8, tw: Math.random() * Math.PI * 2, tws: 0.5 + Math.random() * 2, layer: layer });
   }
   var nebulae = [
     { x: 90, y: 140, r: 170, c: '90,60,190', a: 0.16, vx: 3, vy: 2 },
@@ -214,8 +244,18 @@
       var sp = (speed || 60) + Math.random() * 180;
       particles.push({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.5 + Math.random() * 0.5, t: 0, color: color, r: 2 + Math.random() * 3 });
     }
-    if (particles.length > 240) particles.splice(0, particles.length - 240);
+    if (particles.length > particleCap) particles.splice(0, particles.length - particleCap);
   }
+
+  function debrisBurst(x, y, n) {
+    for (var i = 0; i < n; i++) {
+      var a = Math.random() * Math.PI * 2;
+      var sp = 90 + Math.random() * 260;
+      particles.push({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.6 + Math.random() * 0.6, t: 0, color: Math.random() < 0.5 ? '#c98a4b' : '#ff9f1c', r: 3 + Math.random() * 4, shard: true, rot: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 12 });
+    }
+    if (particles.length > particleCap) particles.splice(0, particles.length - particleCap);
+  }
+  function shockwave(x, y) { shockwaves.push({ x: x, y: y, r: 8, maxR: 95, t: 0, life: 0.5 }); }
 
   function dist(a, b) {
     var dx = a.x - b.x;
@@ -313,6 +353,8 @@
         shake = 0.35;
         burst(player.x, player.y, '#ff6b6b', 30, 90);
         burst(player.x, player.y, '#ffd166', 14, 60);
+        debrisBurst(player.x, player.y, 12);
+        shockwave(player.x, player.y);
         beep(140, 0.25, 'sawtooth', 0.09);
         meteors.splice(i, 1);
         updateHud();
@@ -339,6 +381,11 @@
       }
     }
 
+    for (var sw = shockwaves.length - 1; sw >= 0; sw--) {
+      shockwaves[sw].t += dt;
+      shockwaves[sw].r = 8 + (shockwaves[sw].maxR - 8) * (shockwaves[sw].t / shockwaves[sw].life);
+      if (shockwaves[sw].t >= shockwaves[sw].life) shockwaves.splice(sw, 1);
+    }
     // Particles + background drift.
     for (var k = particles.length - 1; k >= 0; k--) {
       var p = particles[k];
@@ -346,6 +393,7 @@
       p.x += p.vx * dt;
       p.y += p.vy * dt;
       p.vx *= (1 - dt * 1.5); p.vy *= (1 - dt * 1.5);
+      if (p.shard) p.rot += (p.vr || 0) * dt;
       if (p.t >= p.life) particles.splice(k, 1);
     }
     for (var b = 0; b < bgStars.length; b++) {
@@ -367,11 +415,17 @@
     ctx.save();
     ctx.translate(player.x, player.y);
     ctx.rotate(player.tilt);
-    // Glow.
+    // Bloom glow: pre-rendered sprite (cheap) + shadowBlur on max quality.
+    if (glowCyan) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.drawImage(glowCyan, -42, -42, 84, 84);
+      ctx.restore();
+    }
     ctx.shadowColor = '#4cc9f0';
-    ctx.shadowBlur = 18;
+    ctx.shadowBlur = qualityLevel >= 2 ? 0 : 18;
     // Flame (drawn first, under the hull).
-    ctx.shadowBlur = 12;
+    ctx.shadowBlur = qualityLevel >= 2 ? 0 : 12;
     ctx.shadowColor = '#ff9f1c';
     var fl = 22 + Math.random() * 10;
     ctx.fillStyle = '#ff9f1c';
@@ -388,7 +442,7 @@
     ctx.lineTo(3.5, 14);
     ctx.closePath();
     ctx.fill();
-    ctx.shadowBlur = 18;
+    ctx.shadowBlur = qualityLevel >= 2 ? 0 : 18;
     ctx.shadowColor = '#4cc9f0';
     // Hull with gradient.
     var hg = null;
@@ -428,6 +482,13 @@
   }
 
   function drawMeteor(m) {
+    if (glowOrange) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.35;
+      ctx.drawImage(glowOrange, m.x - m.r * 1.6, m.y - m.r * 1.6, m.r * 3.2, m.r * 3.2);
+      ctx.restore();
+    }
     ctx.save();
     ctx.translate(m.x, m.y);
     ctx.rotate(m.rot);
@@ -467,8 +528,14 @@
     ctx.translate(s.x, s.y);
     ctx.rotate(s.rot);
     ctx.scale(pulse, pulse);
+    if (glowGold) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.drawImage(glowGold, -s.r * 2.4, -s.r * 2.4, s.r * 4.8, s.r * 4.8);
+      ctx.restore();
+    }
     ctx.shadowColor = '#ffd166';
-    ctx.shadowBlur = 14;
+    ctx.shadowBlur = qualityLevel >= 2 ? 0 : 14;
     ctx.fillStyle = '#ffd166';
     ctx.strokeStyle = '#fff3c4';
     ctx.lineWidth = 1.5;
@@ -528,10 +595,13 @@
     ctx.fillStyle = '#ffffff';
     for (var i = 0; i < bgStars.length; i++) {
       var b = bgStars[i];
+      // Parallax: near layers shift against the ship's position.
+      var px = (((b.x - player.x * 0.035 * b.layer) % W) + W) % W;
+      var py = (((b.y - player.y * 0.015 * b.layer) % H) + H) % H;
       ctx.globalAlpha = 0.25 + 0.65 * Math.abs(Math.sin(b.tw));
       var sz = b.s;
-      ctx.fillRect(b.x, b.y, sz, sz);
-      if (sz > 2) { ctx.globalAlpha *= 0.5; ctx.fillRect(b.x - 1, b.y + sz / 2 - 0.5, sz + 2, 1); ctx.fillRect(b.x + sz / 2 - 0.5, b.y - 1, 1, sz + 2); }
+      ctx.fillRect(px, py, sz, sz);
+      if (sz > 2) { ctx.globalAlpha *= 0.5; ctx.fillRect(px - 1, py + sz / 2 - 0.5, sz + 2, 1); ctx.fillRect(px + sz / 2 - 0.5, py - 1, 1, sz + 2); }
     }
     ctx.globalAlpha = 1;
     if (shootingStar) {
@@ -545,6 +615,15 @@
     }
 
     if (state === 'title') {
+      if (glowGold) {
+        var pulse = 120 + 18 * Math.sin(Date.now() / 500);
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.5;
+        ctx.drawImage(glowGold, W / 2 - pulse, 205 - pulse, pulse * 2, pulse * 2);
+        ctx.restore();
+        ctx.globalAlpha = 1;
+      }
       centerText([
         { text: 'STAR DODGE HD', font: 'bold 42px system-ui, sans-serif', color: '#ffd166', gap: 52 },
         { text: 'Dodge the meteors.', font: '18px system-ui, sans-serif', color: '#eef2ff', gap: 26 },
@@ -559,13 +638,37 @@
     } else {
       for (var s = 0; s < stars.length; s++) drawStarShape(stars[s]);
       for (var m = 0; m < meteors.length; m++) drawMeteor(meteors[m]);
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
       for (var p = 0; p < particles.length; p++) {
         var pt = particles[p];
         ctx.globalAlpha = 1 - pt.t / pt.life;
         ctx.fillStyle = pt.color;
+        if (pt.shard) {
+          ctx.save();
+          ctx.translate(pt.x, pt.y);
+          ctx.rotate(pt.rot || 0);
+          ctx.fillRect(-pt.r, -pt.r / 2, pt.r * 2, pt.r);
+          ctx.restore();
+        } else {
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, pt.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.restore();
+      ctx.globalAlpha = 1;
+      for (var swi = 0; swi < shockwaves.length; swi++) {
+        var swv = shockwaves[swi];
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.8 * (1 - swv.t / swv.life);
+        ctx.strokeStyle = '#ffd166';
+        ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.arc(pt.x, pt.y, pt.r, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.arc(swv.x, swv.y, swv.r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
       }
       ctx.globalAlpha = 1;
       drawShip();
@@ -613,6 +716,9 @@
         ], 300);
       }
     }
+    // Vignette: darkens the edges, focuses the eye on the ship.
+    var vg = radial(W / 2, H / 2, H * 0.75, 'rgba(0,0,8,0)', 'rgba(0,0,10,0.38)');
+    if (vg) { ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H); }
     if (flash > 0) {
       ctx.fillStyle = 'rgba(255,60,60,' + (flash * 0.9) + ')';
       ctx.fillRect(0, 0, W, H);
@@ -622,6 +728,15 @@
 
   var last = 0;
   function loop(ts) {
+    var rawMs = ts - last;
+    if (rawMs > 0 && rawMs < 500) {
+      frameEma = frameEma * 0.95 + rawMs * 0.05;
+      frameCount++;
+      if (frameCount % 180 === 0 && frameEma > 26 && qualityLevel < 2) {
+        qualityLevel++;
+        particleCap = [240, 120, 60][qualityLevel];
+      }
+    }
     var dt = Math.max(0, Math.min(0.05, (ts - last) / 1000 || 0));
     last = ts;
     if (state === 'playing') update(dt);
