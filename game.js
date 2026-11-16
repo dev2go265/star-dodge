@@ -25,7 +25,7 @@
   var flash = 0;
   var shake = 0;
 
-  var player = { x: W / 2, y: H - 110, r: 18, speed: 340, tx: W / 2, ty: H - 110, dragging: false };
+  var player = { x: W / 2, y: H - 110, r: 18, speed: 370, tx: W / 2, ty: H - 110, dragging: false };
   var keys = {};
   var meteors = [];
   var stars = [];
@@ -104,7 +104,7 @@
       x: r + Math.random() * (W - r * 2),
       y: -r - 10,
       r: r,
-      vy: 120 + Math.random() * 130 + level * 28,
+      vy: 110 + Math.random() * 110 + level * 22,
       vx: (Math.random() - 0.5) * 60,
       rot: Math.random() * Math.PI * 2,
       vr: (Math.random() - 0.5) * 2.4
@@ -169,7 +169,7 @@
     if (spawnTimer <= 0) {
       spawnMeteor();
       if (level >= 3 && Math.random() < 0.4) spawnMeteor();
-      spawnTimer = Math.max(0.28, 0.85 - level * 0.09) * (0.7 + Math.random() * 0.6);
+      spawnTimer = Math.max(0.35, 1.0 - level * 0.08) * (0.7 + Math.random() * 0.6);
     }
     starTimer -= dt;
     if (starTimer <= 0) { spawnStar(); starTimer = 0.9 + Math.random() * 0.9; }
@@ -187,7 +187,7 @@
       if (m.y - m.r > H || m.x < -60 || m.x > W + 60) { meteors.splice(i, 1); continue; }
       if (invuln <= 0 && dist(m, player) < m.r + player.r - 6) {
         lives -= 1;
-        invuln = 1.5;
+        invuln = 2.0;
         flash = 0.35;
         shake = 0.35;
         burst(player.x, player.y, '#ff6b6b', 22);
@@ -402,7 +402,7 @@
 
   var last = 0;
   function loop(ts) {
-    var dt = Math.min(0.05, (ts - last) / 1000 || 0);
+    var dt = Math.max(0, Math.min(0.05, (ts - last) / 1000 || 0));
     last = ts;
     if (state === 'playing') update(dt);
     draw();
