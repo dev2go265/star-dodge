@@ -3,27 +3,47 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Star Dodge</title>
+<title>Star Dodge HD</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <main class="wrap">
-  <h1 class="title">STAR DODGE</h1>
+  <h1 class="title">STAR DODGE <span class="hd-badge">HD</span></h1>
   <p class="tagline">Dodge the meteors. Grab the stars. Reach 500 to win.</p>
   <div class="game-box">
-    <canvas id="game" width="480" height="720" aria-label="Star Dodge game"></canvas>
+    <canvas id="game" width="960" height="1440" aria-label="Star Dodge game"></canvas>
     <div class="hud" id="hud">
       <span id="hud-score">Score: 0</span>
       <span id="hud-lives">Lives: ♥♥♥</span>
+      <span id="hud-best">Best: 0</span>
       <span id="hud-goal">Goal: 500</span>
     </div>
   </div>
+  <section class="settings" aria-label="Game settings">
+    <h2>Settings</h2>
+    <label class="setting-row">
+      <span>Sensitivity <b id="sens-val">1.0×</b></span>
+      <input id="sens-range" type="range" min="0.5" max="2" step="0.1" value="1">
+      <span class="range-hint">Slow — Fast</span>
+    </label>
+    <label class="setting-row">
+      <span>Meteor speed <b id="diff-val">1.0×</b></span>
+      <input id="diff-range" type="range" min="0.5" max="2" step="0.1" value="1">
+      <span class="range-hint">Chill — Intense</span>
+    </label>
+    <label class="setting-row checkbox-row">
+      <span>Sound</span>
+      <input id="mute-check" type="checkbox">
+      <span class="range-hint" id="mute-label">On</span>
+    </label>
+  </section>
   <div class="controls">
-    <p><strong>Move:</strong> Arrow keys / WASD, or drag with mouse / finger</p>
+    <p><strong>Move:</strong> Arrow keys (↑ ↓ ← →) or WASD — full 2D, or drag with mouse / finger</p>
     <p><strong>Start / Restart:</strong> Enter or Space &nbsp;•&nbsp; <strong>Pause:</strong> P &nbsp;•&nbsp; <strong>Mute:</strong> M</p>
+    <p>Tip: raise Sensitivity if the ship feels sluggish, lower Meteor speed if it feels unfair. Settings save automatically.</p>
     <button id="start-btn" type="button">Play</button>
   </div>
-  <p class="foot">A tiny game, drawn entirely in code. No downloads, no sign-up.</p>
+  <p class="foot">Star Dodge HD — drawn entirely in code. No downloads, no sign-up.</p>
 </main>
 <script src="game.js"></script>
 </body>
