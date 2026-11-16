@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Star Dodge</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="wrap">
+  <h1 class="title">STAR DODGE</h1>
+  <p class="tagline">Dodge the meteors. Grab the stars. Reach 500 to win.</p>
+  <div class="game-box">
+    <canvas id="game" width="480" height="720" aria-label="Star Dodge game"></canvas>
+    <div class="hud" id="hud">
+      <span id="hud-score">Score: 0</span>
+      <span id="hud-lives">Lives: ♥♥♥</span>
+      <span id="hud-goal">Goal: 500</span>
+    </div>
+  </div>
+  <div class="controls">
+    <p><strong>Move:</strong> Arrow keys / WASD, or drag with mouse / finger</p>
+    <p><strong>Start / Restart:</strong> Enter or Space &nbsp;•&nbsp; <strong>Pause:</strong> P &nbsp;•&nbsp; <strong>Mute:</strong> M</p>
+    <button id="start-btn" type="button">Play</button>
+  </div>
+  <p class="foot">A tiny game, drawn entirely in code. No downloads, no sign-up.</p>
+</main>
+<script src="game.js"></script>
+</body>
+</html>
